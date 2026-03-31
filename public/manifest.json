@@ -1,0 +1,28 @@
+{
+  "name": "taNaMão - Pedidos Online",
+  "short_name": "taNaMão",
+  "description": "Sistema simples de pedidos online com WhatsApp",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#f97316",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/tanamao.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/tanamao.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/tanamao.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
