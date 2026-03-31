@@ -72,7 +72,7 @@ export default function Home() {
 
       // Generate WhatsApp link
       const message = generateWhatsAppMessage(cart, total);
-      const phoneNumber = "5511999999999"; // Exemplo, você pode mudar para o seu número
+      const phoneNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5511999999999";
       const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
 
       // Reset cart and open WhatsApp
@@ -88,16 +88,30 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-900 text-white p-4 sm:p-8">
-      <header className="max-w-7xl mx-auto flex justify-between items-center mb-12">
-        <h1 className="text-4xl font-extrabold text-orange-500 tracking-tight italic">taNaMão</h1>
-        <Link href="/admin" className="text-gray-400 hover:text-blue-400 font-medium">Admin</Link>
+    <main className="min-h-screen bg-[#0f172a] text-slate-200 p-4 md:p-10">
+      <header className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center mb-16 gap-6">
+        <div className="flex flex-col items-center sm:items-start">
+          <h1 className="text-6xl font-black tracking-tighter italic text-orange-500 drop-shadow-[0_0_15px_rgba(249,115,22,0.4)]">
+            taNaMão
+          </h1>
+          <p className="text-slate-400 font-medium mt-1">O sabor que você deseja, na velocidade que você precisa.</p>
+        </div>
+        <Link 
+          href="/admin" 
+          className="bg-slate-800/50 hover:bg-slate-700/50 px-6 py-2 rounded-full border border-slate-700 text-sm font-bold transition-all"
+        >
+          Painel Admin
+        </Link>
       </header>
 
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-12">
-        <div className="lg:col-span-2">
-          <h2 className="text-2xl font-bold text-gray-100 mb-6">Nossos Produtos</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10">
+        <div className="lg:col-span-8">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="h-8 w-1.5 bg-orange-500 rounded-full"></div>
+            <h2 className="text-3xl font-black text-white">Cardápio Especial</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
             {products.map((product) => (
               <ProductCard
                 key={product.id}
@@ -106,13 +120,16 @@ export default function Home() {
               />
             ))}
             {products.length === 0 && (
-              <p className="col-span-2 text-center text-gray-500 py-12">Carregando produtos...</p>
+              <div className="col-span-full flex flex-col items-center justify-center py-20 bg-slate-800/20 rounded-3xl border border-dashed border-slate-700">
+                <div className="text-5xl mb-4 animate-pulse">🍳</div>
+                <p className="text-slate-500 font-bold">Preparando o cardápio...</p>
+              </div>
             )}
           </div>
         </div>
 
-        <aside className="lg:col-span-1">
-          <div className="sticky top-8">
+        <aside className="lg:col-span-4">
+          <div className="sticky top-10">
             <Cart
               items={cart}
               total={calculateTotal()}
@@ -122,6 +139,10 @@ export default function Home() {
           </div>
         </aside>
       </div>
+
+      <footer className="max-w-7xl mx-auto mt-20 pt-10 border-t border-slate-800/50 text-center">
+        <p className="text-slate-500 text-sm font-medium">© 2024 taNaMão Delivery. Todos os direitos reservados.</p>
+      </footer>
     </main>
   );
 }
