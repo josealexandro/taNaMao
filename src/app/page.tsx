@@ -1,208 +1,100 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { db, auth, googleProvider } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, serverTimestamp } from 'firebase/firestore';
-import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
-import { Product } from '@/types/Product';
-import { OrderItem } from '@/types/Order';
-import ProductCard from '@/components/ProductCard';
-import Cart from '@/components/Cart';
+import { useEffect, useState } from 'react';
+import { db, auth } from '@/lib/firebase';
+import { collection, onSnapshot, query, limit } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
+import { Restaurant } from '@/types/Restaurant';
 import Link from 'next/link';
 
-export default function Home() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [cart, setCart] = useState<OrderItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-
-  const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'alexnaguibass@gmail.com';
+export default function RootPage() {
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    // 1. Verificar se o usuário já está logado e é um restaurante
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // Opcional: Redirecionar para o admin se já estiver logado
+        // router.push('/admin');
+      }
     });
 
-    const q = query(collection(db, 'products'));
-    const unsubscribeProducts = onSnapshot(q, (querySnapshot) => {
-      const productsData: Product[] = [];
+    // 2. Buscar todos os restaurantes cadastrados
+    const q = query(collection(db, 'restaurants'), limit(20));
+    const unsubscribeRest = onSnapshot(q, (querySnapshot) => {
+      const rests: Restaurant[] = [];
       querySnapshot.forEach((doc) => {
-        productsData.push({ id: doc.id, ...doc.data() } as Product);
+        rests.push({ id: doc.id, ...doc.data() } as Restaurant);
       });
-      setProducts(productsData);
+      setRestaurants(rests);
+      setLoading(false);
     });
 
     return () => {
       unsubscribeAuth();
-      unsubscribeProducts();
+      unsubscribeRest();
     };
-  }, []);
+  }, [router]);
 
-  const handleLogin = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error("Login failed:", error);
-    }
-  };
-
-  const handleLogout = async () => {
-    await signOut(auth);
-  };
-
-  const addToCart = (product: Product) => {
-    setCart((prevCart) => {
-      const existingItem = prevCart.find((item) => item.name === product.name);
-      if (existingItem) {
-        return prevCart.map((item) =>
-          item.name === product.name
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      return [...prevCart, { name: product.name, quantity: 1, price: product.price }];
-    });
-  };
-
-  const calculateTotal = () => {
-    return cart.reduce((total, item) => total + item.price * item.quantity, 0);
-  };
-
-  const generateWhatsAppMessage = (items: OrderItem[], total: number) => {
-    let message = "*Novo Pedido Realizado!*\n\n";
-    message += "*Itens:*\n";
-    items.forEach((item) => {
-      message += `- ${item.quantity}x ${item.name} (R$ ${item.price.toFixed(2)} cada)\n`;
-    });
-    message += `\n*Total:* R$ ${total.toFixed(2)}`;
-    return encodeURIComponent(message);
-  };
-
-  const handleFinishOrder = async () => {
-    if (cart.length === 0) return;
-
-    setLoading(true);
-    const total = calculateTotal();
-
-    try {
-      // Save to Firestore
-      await addDoc(collection(db, 'orders'), {
-        items: cart,
-        total: total,
-        status: 'pending',
-        createdAt: serverTimestamp(),
-      });
-
-      // Generate WhatsApp link
-      const message = generateWhatsAppMessage(cart, total);
-      const phoneNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5511999999999";
-      const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
-
-      // Reset cart and open WhatsApp
-      setCart([]);
-      window.open(whatsappUrl, '_blank');
-      alert('Pedido realizado com sucesso! Você será redirecionado para o WhatsApp.');
-    } catch (error) {
-      console.error("Error creating order: ", error);
-      alert('Erro ao realizar pedido. Tente novamente.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-orange-500/30 border-t-orange-500 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-[#0f172a] text-slate-200 p-4 md:p-10">
-      <header className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center mb-16 gap-6">
-        <div className="flex flex-col items-center sm:items-start">
-          <h1 className="text-6xl font-black tracking-tighter italic text-orange-500 drop-shadow-[0_0_15px_rgba(249,115,22,0.4)]">
-            taNaMão
-          </h1>
-          <p className="text-slate-400 font-medium mt-1">O sabor que você deseja, na velocidade que você precisa.</p>
-        </div>
-        
-        <div className="flex items-center gap-4">
-          {user ? (
-            <div className="flex items-center gap-4 bg-slate-800/50 p-2 pl-4 rounded-full border border-slate-700">
-              <div className="flex flex-col items-end">
-                <span className="text-xs font-bold text-slate-200">{user.displayName || user.email}</span>
-                {user.email === ADMIN_EMAIL && (
-                  <Link href="/admin" className="text-[10px] text-orange-500 font-black uppercase hover:underline">
-                    Acessar Painel
-                  </Link>
-                )}
-              </div>
-              <button 
-                onClick={handleLogout}
-                className="bg-slate-700 hover:bg-red-900/30 text-slate-300 hover:text-red-400 p-2 rounded-full transition-all"
-                title="Sair"
-              >
-                <span className="text-sm">🚪</span>
-              </button>
-              <img src={user.photoURL || ''} alt="User" className="w-8 h-8 rounded-full border-2 border-orange-500" />
-            </div>
-          ) : (
-            <button 
-              onClick={handleLogin}
-              className="bg-orange-500 hover:bg-orange-600 px-8 py-3 rounded-full text-white font-bold transition-all shadow-lg shadow-orange-500/20 active:scale-95 flex items-center gap-2"
+    <main className="min-h-screen bg-[#0f172a] text-slate-200 p-6 md:p-20">
+      <div className="max-w-6xl mx-auto">
+        <header className="text-center mb-16">
+          <img src="/tanamao_512.png" alt="Logo" className="h-32 mx-auto mb-6 drop-shadow-[0_0_20px_rgba(249,115,22,0.4)]" />
+          <h1 className="text-5xl font-black text-white italic tracking-tight">Onde vamos pedir hoje?</h1>
+          <p className="text-slate-400 mt-4 text-xl">Escolha seu restaurante favorito e peça agora!</p>
+        </header>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          {restaurants.map((rest) => (
+            <Link 
+              key={rest.id} 
+              href={`/r/${rest.slug}`}
+              className="group bg-slate-800/40 backdrop-blur-md p-8 rounded-[2.5rem] border border-slate-700/50 hover:border-orange-500/50 transition-all hover:scale-[1.02] hover:shadow-2xl hover:shadow-orange-500/10"
             >
-              <span>Entrar</span>
-              <span className="text-lg">👤</span>
-            </button>
-          )}
-        </div>
-      </header>
-
-
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10">
-        <div className="lg:col-span-8">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="h-8 w-1.5 bg-orange-500 rounded-full"></div>
-            <h2 className="text-3xl font-black text-white">Cardápio Especial</h2>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-            {products.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onAddToCart={addToCart}
-              />
-            ))}
-            {products.length === 0 && (
-              <div className="col-span-full flex flex-col items-center justify-center py-20 bg-slate-800/20 rounded-3xl border border-dashed border-slate-700">
-                <div className="text-5xl mb-4 animate-pulse">🍳</div>
-                <p className="text-slate-500 font-bold">Preparando o cardápio...</p>
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center text-3xl font-black text-white shadow-lg group-hover:rotate-6 transition-transform">
+                  {rest.name.charAt(0)}
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black text-white group-hover:text-orange-500 transition-colors">{rest.name}</h2>
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Clique para ver o cardápio</p>
+                </div>
               </div>
-            )}
-          </div>
+              <div className="flex items-center gap-2 text-orange-500 font-black text-sm">
+                <span>VER MENU</span>
+                <span className="group-hover:translate-x-2 transition-transform">🚀</span>
+              </div>
+            </Link>
+          ))}
+
+          {/* Card para novos restaurantes */}
+          <Link 
+            href="/login"
+            className="group bg-slate-900/40 border-2 border-dashed border-slate-700 p-8 rounded-[2.5rem] flex flex-col items-center justify-center text-center hover:border-orange-500/50 transition-all"
+          >
+            <div className="text-4xl mb-4 grayscale group-hover:grayscale-0 transition-all">🏪</div>
+            <h2 className="text-xl font-black text-white">Seu Restaurante Aqui</h2>
+            <p className="text-sm text-slate-500 mt-2">Cadastre sua loja e comece a vender agora!</p>
+            <span className="mt-4 text-orange-500 font-bold group-hover:underline">Cadastrar Loja →</span>
+          </Link>
         </div>
 
-        {/* Lado do Carrinho: No mobile ele some daqui pois agora é um FAB (Floating Action Button) */}
-        <aside className="hidden md:block lg:col-span-4">
-          <div className="sticky top-10">
-            <Cart
-              items={cart}
-              total={calculateTotal()}
-              onFinishOrder={handleFinishOrder}
-              loading={loading}
-            />
-          </div>
-        </aside>
-
-        {/* Carrinho Mobile: Renderiza apenas no mobile fora da grid */}
-        <div className="md:hidden">
-          <Cart
-            items={cart}
-            total={calculateTotal()}
-            onFinishOrder={handleFinishOrder}
-            loading={loading}
-          />
-        </div>
+        <footer className="mt-24 text-center text-slate-600 text-sm font-medium">
+          © 2024 taNaMão Delivery. Sua comida favorita a um toque de distância.
+        </footer>
       </div>
-
-      <footer className="max-w-7xl mx-auto mt-20 pt-10 border-t border-slate-800/50 text-center">
-        <p className="text-slate-500 text-sm font-medium">© 2024 taNaMão Delivery. Todos os direitos reservados.</p>
-      </footer>
     </main>
   );
 }

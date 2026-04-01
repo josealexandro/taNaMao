@@ -24,8 +24,9 @@ export const metadata: Metadata = {
     title: "taNaMão",
   },
   icons: {
-    icon: "/tanamao.png",
-    apple: "/tanamao.png",
+    icon: "/tanamao_512.png",
+    shortcut: "/tanamao_512.png",
+    apple: "/tanamao_512.png",
   },
 };
 
