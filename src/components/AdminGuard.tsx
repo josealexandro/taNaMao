@@ -5,7 +5,7 @@ import { auth, googleProvider } from '@/lib/firebase';
 import { signInWithPopup, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 
-const ADMIN_EMAIL = 'alexnaguibass@gmail.com';
+const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'alexnaguibass@gmail.com';
 
 export default function AdminGuard({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

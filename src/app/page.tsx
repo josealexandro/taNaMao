@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase';
+import { db, auth, googleProvider } from '@/lib/firebase';
 import { collection, addDoc, onSnapshot, query, serverTimestamp } from 'firebase/firestore';
+import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
 import { Product } from '@/types/Product';
 import { OrderItem } from '@/types/Order';
 import ProductCard from '@/components/ProductCard';
@@ -13,10 +14,17 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+
+  const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'alexnaguibass@gmail.com';
 
   useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+
     const q = query(collection(db, 'products'));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const unsubscribeProducts = onSnapshot(q, (querySnapshot) => {
       const productsData: Product[] = [];
       querySnapshot.forEach((doc) => {
         productsData.push({ id: doc.id, ...doc.data() } as Product);
@@ -24,8 +32,23 @@ export default function Home() {
       setProducts(productsData);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      unsubscribeProducts();
+    };
   }, []);
+
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Login failed:", error);
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+  };
 
   const addToCart = (product: Product) => {
     setCart((prevCart) => {
@@ -96,13 +119,39 @@ export default function Home() {
           </h1>
           <p className="text-slate-400 font-medium mt-1">O sabor que você deseja, na velocidade que você precisa.</p>
         </div>
-        <Link 
-          href="/admin" 
-          className="bg-slate-800/50 hover:bg-slate-700/50 px-6 py-2 rounded-full border border-slate-700 text-sm font-bold transition-all"
-        >
-          Painel Admin
-        </Link>
+        
+        <div className="flex items-center gap-4">
+          {user ? (
+            <div className="flex items-center gap-4 bg-slate-800/50 p-2 pl-4 rounded-full border border-slate-700">
+              <div className="flex flex-col items-end">
+                <span className="text-xs font-bold text-slate-200">{user.displayName || user.email}</span>
+                {user.email === ADMIN_EMAIL && (
+                  <Link href="/admin" className="text-[10px] text-orange-500 font-black uppercase hover:underline">
+                    Acessar Painel
+                  </Link>
+                )}
+              </div>
+              <button 
+                onClick={handleLogout}
+                className="bg-slate-700 hover:bg-red-900/30 text-slate-300 hover:text-red-400 p-2 rounded-full transition-all"
+                title="Sair"
+              >
+                <span className="text-sm">🚪</span>
+              </button>
+              <img src={user.photoURL || ''} alt="User" className="w-8 h-8 rounded-full border-2 border-orange-500" />
+            </div>
+          ) : (
+            <button 
+              onClick={handleLogin}
+              className="bg-orange-500 hover:bg-orange-600 px-8 py-3 rounded-full text-white font-bold transition-all shadow-lg shadow-orange-500/20 active:scale-95 flex items-center gap-2"
+            >
+              <span>Entrar</span>
+              <span className="text-lg">👤</span>
+            </button>
+          )}
+        </div>
       </header>
+
 
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10">
         <div className="lg:col-span-8">
@@ -128,7 +177,8 @@ export default function Home() {
           </div>
         </div>
 
-        <aside className="lg:col-span-4">
+        {/* Lado do Carrinho: No mobile ele some daqui pois agora é um FAB (Floating Action Button) */}
+        <aside className="hidden md:block lg:col-span-4">
           <div className="sticky top-10">
             <Cart
               items={cart}
@@ -138,6 +188,16 @@ export default function Home() {
             />
           </div>
         </aside>
+
+        {/* Carrinho Mobile: Renderiza apenas no mobile fora da grid */}
+        <div className="md:hidden">
+          <Cart
+            items={cart}
+            total={calculateTotal()}
+            onFinishOrder={handleFinishOrder}
+            loading={loading}
+          />
+        </div>
       </div>
 
       <footer className="max-w-7xl mx-auto mt-20 pt-10 border-t border-slate-800/50 text-center">

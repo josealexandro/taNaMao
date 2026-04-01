@@ -1,4 +1,5 @@
 import { OrderItem } from '@/types/Order';
+import { useState } from 'react';
 
 interface CartProps {
   items: OrderItem[];
@@ -8,11 +9,23 @@ interface CartProps {
 }
 
 export default function Cart({ items, total, onFinishOrder, loading }: CartProps) {
-  return (
-    <div className="bg-slate-800/80 backdrop-blur-md rounded-3xl shadow-2xl p-8 w-full max-w-md border border-slate-700/50">
-      <div className="flex items-center gap-3 mb-8">
-        <span className="text-3xl">🛒</span>
-        <h2 className="text-2xl font-black text-white">Seu Carrinho</h2>
+  const [isOpen, setIsOpen] = useState(false);
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  const CartContent = () => (
+    <div className="bg-slate-800/95 backdrop-blur-xl rounded-3xl shadow-2xl p-6 md:p-8 w-full border border-slate-700/50">
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-3">
+          <span className="text-3xl">🛒</span>
+          <h2 className="text-2xl font-black text-white">Seu Carrinho</h2>
+        </div>
+        {/* Botão de fechar apenas no mobile modal */}
+        <button 
+          onClick={() => setIsOpen(false)}
+          className="md:hidden text-slate-400 hover:text-white p-2"
+        >
+          <span className="text-2xl">✕</span>
+        </button>
       </div>
       
       {items.length === 0 ? (
@@ -56,7 +69,10 @@ export default function Cart({ items, total, onFinishOrder, loading }: CartProps
           </div>
 
           <button
-            onClick={onFinishOrder}
+            onClick={() => {
+              onFinishOrder();
+              setIsOpen(false);
+            }}
             disabled={loading}
             className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black py-5 rounded-2xl transition-all duration-300 shadow-xl shadow-orange-500/20 flex items-center justify-center gap-3 disabled:opacity-50 active:scale-[0.98]"
           >
@@ -76,4 +92,42 @@ export default function Cart({ items, total, onFinishOrder, loading }: CartProps
       )}
     </div>
   );
+
+  return (
+    <>
+      {/* Desktop Version: Always visible */}
+      <div className="hidden md:block">
+        <CartContent />
+      </div>
+
+      {/* Mobile Version: Floating Button */}
+      <div className="md:hidden">
+        {itemCount > 0 && (
+          <button
+            onClick={() => setIsOpen(true)}
+            className="fixed bottom-6 right-6 z-50 bg-orange-500 text-white w-16 h-16 rounded-full shadow-2xl shadow-orange-500/40 flex items-center justify-center hover:scale-110 active:scale-90 transition-all border-4 border-slate-900 animate-in fade-in zoom-in duration-300"
+          >
+            <span className="text-2xl">🛒</span>
+            <span className="absolute -top-1 -right-1 bg-white text-orange-600 text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center shadow-md border-2 border-orange-500">
+              {itemCount}
+            </span>
+          </button>
+        )}
+
+        {/* Mobile Modal Overlay */}
+        {isOpen && (
+          <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-200">
+            <div 
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+              onClick={() => setIsOpen(false)}
+            />
+            <div className="relative w-full max-w-lg animate-in slide-in-from-bottom-10 duration-300">
+              <CartContent />
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
 }
+
