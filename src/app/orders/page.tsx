@@ -54,6 +54,14 @@ export default function OrdersPage() {
     if (digits.length === 13 && digits.startsWith('55')) return digits;
     return null;
   };
+  const buildWhatsAppUrl = (phoneNumber: string, message: string) => {
+    const isMobile =
+      typeof navigator !== 'undefined' &&
+      /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    return isMobile
+      ? `https://wa.me/${phoneNumber}?text=${message}`
+      : `https://web.whatsapp.com/send?phone=${phoneNumber}&text=${message}`;
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -155,7 +163,7 @@ export default function OrdersPage() {
                 `Olá! Gostaria de saber o status do meu pedido (${order.orderNumber ? `#${order.orderNumber}` : order.id}).`
               );
               const restaurantPhone = formatWhatsappForWaMe(restaurant?.whatsapp);
-              const waUrl = restaurantPhone ? `https://wa.me/${restaurantPhone}?text=${message}` : null;
+              const waUrl = restaurantPhone ? buildWhatsAppUrl(restaurantPhone, message) : null;
 
               return (
                 <div key={order.id} className="bg-slate-800/50 backdrop-blur-sm p-6 rounded-3xl border border-slate-700 shadow-2xl">

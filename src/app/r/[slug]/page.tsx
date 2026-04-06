@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { db, auth } from '@/lib/firebase';
 import { collection, onSnapshot, query, serverTimestamp, limit, where, doc, getDoc, runTransaction } from 'firebase/firestore';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
@@ -27,6 +27,8 @@ export default function Home() {
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isRestaurantUser, setIsRestaurantUser] = useState(false);
+  const isFinishingOrderRef = useRef(false);
+  const hasOpenedWhatsAppRef = useRef(false);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -119,9 +121,27 @@ export default function Home() {
     return encodeURIComponent(message);
   };
 
+  const openWhatsApp = (phoneNumber: string, message: string) => {
+    const nav = navigator as Navigator & { userAgentData?: { mobile?: boolean } };
+    const isMobile =
+      typeof nav.userAgentData?.mobile === 'boolean'
+        ? Boolean(nav.userAgentData.mobile)
+        : /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    const url = isMobile
+      ? `https://wa.me/${phoneNumber}?text=${message}`
+      : `https://web.whatsapp.com/send?phone=${phoneNumber}&text=${message}`;
+
+    const win = window.open(url, '_blank', 'noopener,noreferrer');
+    if (win === null) window.location.assign(url);
+  };
+
   const handleFinishOrder = async (address: string, clientName: string, clientPhone: string) => {
     if (cart.length === 0 || !restaurant) return;
+    if (isFinishingOrderRef.current) return;
 
+    isFinishingOrderRef.current = true;
+    hasOpenedWhatsAppRef.current = false;
     setLoading(true);
     const total = calculateTotal();
 
@@ -153,7 +173,6 @@ export default function Home() {
       // Generate WhatsApp link
       const message = generateWhatsAppMessage(newOrderNumber, cart, total, address);
       const phoneNumber = formatWhatsappForWaMe(restaurant.whatsapp) || "5511999999999";
-      const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
 
       // Show success animation
       setLastOrderNumber(newOrderNumber);
@@ -161,16 +180,19 @@ export default function Home() {
 
       // Reset cart and open WhatsApp after animation
       setTimeout(() => {
+        if (hasOpenedWhatsAppRef.current) return;
+        hasOpenedWhatsAppRef.current = true;
         setShowSuccess(false);
         setLastOrderNumber(null);
         setCart([]);
-        window.open(whatsappUrl, '_blank');
+        openWhatsApp(phoneNumber, message);
       }, 7500); // 7.5 seconds for even slower animation
     } catch (error) {
       console.error("Error creating order: ", error);
       alert('Erro ao realizar pedido. Tente novamente.');
     } finally {
       setLoading(false);
+      isFinishingOrderRef.current = false;
     }
   };
 
@@ -207,7 +229,7 @@ export default function Home() {
                 Pedido <span className="text-orange-500">#{lastOrderNumber}</span>
               </p>
             )}
-            <p className="text-orange-500 font-bold mt-2 text-xl italic">Sua entrega radical está a caminho!</p>
+            <p className="text-orange-500 font-bold mt-2 text-xl italic">Seu Pedido está em andamento!</p>
           </div>
         </div>
       )}
