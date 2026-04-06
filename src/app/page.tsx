@@ -11,6 +11,7 @@ import Link from 'next/link';
 export default function RootPage() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedRestaurantId, setExpandedRestaurantId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -64,13 +65,25 @@ export default function RootPage() {
               className="group bg-slate-800/40 backdrop-blur-md p-8 rounded-[2.5rem] border border-slate-700/50 hover:border-orange-500/50 transition-all hover:scale-[1.02] hover:shadow-2xl hover:shadow-orange-500/10"
             >
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center text-3xl font-black text-white shadow-lg group-hover:rotate-6 transition-transform overflow-hidden">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!rest.logoUrl) return;
+                    setExpandedRestaurantId((prev) => (prev === rest.id ? null : rest.id));
+                  }}
+                  className={`w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center text-3xl font-black text-white shadow-lg transition-transform overflow-hidden ${
+                    rest.logoUrl ? 'cursor-pointer' : 'cursor-default'
+                  } ${expandedRestaurantId === rest.id ? 'scale-[1.7] ring-4 ring-orange-500/40 shadow-2xl z-10' : 'group-hover:rotate-6 group-hover:scale-105 active:scale-95'}`}
+                  title={rest.logoUrl ? 'Expandir logo' : undefined}
+                >
                   {rest.logoUrl ? (
                     <img src={rest.logoUrl} alt={rest.name} className="w-full h-full object-cover" />
                   ) : (
                     rest.name.charAt(0)
                   )}
-                </div>
+                </button>
                 <div>
                   <h2 className="text-2xl font-black text-white group-hover:text-orange-500 transition-colors">{rest.name}</h2>
                   <div className="flex items-center gap-2 mt-1">

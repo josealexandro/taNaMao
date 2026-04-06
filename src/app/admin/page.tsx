@@ -22,6 +22,7 @@ export default function AdminOrdersPage() {
   const [editedIsOpen, setEditedIsOpen] = useState(true);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isLogoExpanded, setIsLogoExpanded] = useState(false);
   const router = useRouter();
 
   const hasToDate = (value: unknown): value is { toDate: () => Date } => {
@@ -253,8 +254,15 @@ export default function AdminOrdersPage() {
         {/* Top Navigation Bar */}
         <nav className="bg-slate-900 border-b border-slate-800 p-4 px-8 flex justify-between items-center sticky top-0 z-50 backdrop-blur-md">
           <div className="flex items-center gap-4">
-            <div className="relative group">
-              <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center font-black text-xl shadow-lg shadow-orange-500/20 overflow-hidden border-2 border-slate-700">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsLogoExpanded((prev) => !prev)}
+                className={`w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center font-black text-xl shadow-lg shadow-orange-500/20 overflow-hidden border-2 border-slate-700 transition-transform duration-200 ${
+                  isLogoExpanded ? 'scale-150 ring-4 ring-orange-500/40 shadow-2xl z-50' : 'hover:scale-105 active:scale-95'
+                }`}
+                title="Expandir logo"
+              >
                 {isUpdatingLogo ? (
                   <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                 ) : restaurant?.logoUrl ? (
@@ -262,9 +270,12 @@ export default function AdminOrdersPage() {
                 ) : (
                   restaurant?.name?.charAt(0) || 'R'
                 )}
-              </div>
-              <label className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-xl">
-                <span className="text-[10px] font-black text-white uppercase tracking-tighter text-center px-1">Alterar Logo</span>
+              </button>
+              <label
+                className="absolute -bottom-1 -right-1 bg-slate-900 border border-slate-700 rounded-full w-7 h-7 flex items-center justify-center cursor-pointer hover:bg-slate-800 transition-colors shadow-lg"
+                title="Alterar logo"
+              >
+                <span className="text-xs">📷</span>
                 <input type="file" accept="image/*" onChange={handleUpdateLogo} className="hidden" disabled={isUpdatingLogo} />
               </label>
             </div>
@@ -328,7 +339,9 @@ export default function AdminOrdersPage() {
                   <div className="flex justify-between items-start mb-4">
                     <div className="overflow-hidden flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="text-[10px] text-slate-500 font-mono truncate">ID: {order.id}</p>
+                        <p className="text-[10px] text-slate-500 font-mono truncate">
+                          {order.orderNumber ? `Pedido #${order.orderNumber}` : `ID: ${order.id}`}
+                        </p>
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
@@ -492,7 +505,9 @@ export default function AdminOrdersPage() {
           >
             <div className="p-6 sm:p-8 border-b border-slate-800 flex justify-between items-start gap-6 bg-slate-900/50">
               <div className="min-w-0">
-                <p className="text-[10px] text-slate-500 font-mono truncate">ID: {selectedOrder.id}</p>
+                <p className="text-[10px] text-slate-500 font-mono truncate">
+                  {selectedOrder.orderNumber ? `Pedido #${selectedOrder.orderNumber}` : `ID: ${selectedOrder.id}`}
+                </p>
                 <h2 className="text-2xl font-black text-white italic mt-1 truncate">{selectedOrder.clientName}</h2>
                 <p className="text-xs text-slate-400 font-bold mt-1">{selectedOrder.clientPhone}</p>
               </div>
@@ -571,6 +586,7 @@ export default function AdminOrdersPage() {
           </div>
         </div>
       )}
+
     </AdminGuard>
   );
 }

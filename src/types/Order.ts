@@ -18,6 +18,7 @@ export type OrderStatus =
 
 export interface Order {
   id?: string;
+  orderNumber?: number;
   items: OrderItem[];
   total: number;
   address: string;

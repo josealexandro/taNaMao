@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { db, auth } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, serverTimestamp, limit, where, doc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, serverTimestamp, limit, where, doc, getDoc, runTransaction } from 'firebase/firestore';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { Product } from '@/types/Product';
 import { OrderItem } from '@/types/Order';
@@ -22,6 +22,8 @@ export default function Home() {
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [lastOrderNumber, setLastOrderNumber] = useState<number | null>(null);
+  const [isLogoExpanded, setIsLogoExpanded] = useState(false);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isRestaurantUser, setIsRestaurantUser] = useState(false);
@@ -98,8 +100,16 @@ export default function Home() {
     return cart.reduce((total, item) => total + item.price * item.quantity, 0);
   };
 
-  const generateWhatsAppMessage = (items: OrderItem[], total: number, address: string) => {
-    let message = `*Novo Pedido Realizado no ${restaurant?.name || 'taNaMão'}!*\n\n`;
+  const formatWhatsappForWaMe = (raw: string | undefined | null) => {
+    const digits = (raw || '').replace(/\D/g, '');
+    if (!digits) return null;
+    if (digits.length === 11) return `55${digits}`;
+    if (digits.length === 13 && digits.startsWith('55')) return digits;
+    return null;
+  };
+
+  const generateWhatsAppMessage = (orderNumber: number, items: OrderItem[], total: number, address: string) => {
+    let message = `*Novo Pedido #${orderNumber} — ${restaurant?.name || 'taNaMão'}*\n\n`;
     message += "*Itens:*\n";
     items.forEach((item) => {
       message += `- ${item.quantity}x ${item.name} (R$ ${item.price.toFixed(2)} cada)\n`;
@@ -116,30 +126,43 @@ export default function Home() {
     const total = calculateTotal();
 
     try {
-      // Save to Firestore
-      await addDoc(collection(db, 'orders'), {
-        items: cart,
-        total: total,
-        address: address,
-        clientName: clientName,
-        clientPhone: clientPhone,
-        clientUid: user?.uid || null,
-        status: 'pendente',
-        createdAt: serverTimestamp(),
-        restaurantId: restaurant.id,
+      const restRef = doc(db, 'restaurants', restaurant.id);
+      const newOrderNumber = await runTransaction(db, async (transaction) => {
+        const restSnap = await transaction.get(restRef);
+        const current = restSnap.exists() ? ((restSnap.data().orderCounter as number | undefined) ?? 0) : 0;
+        const next = current + 1;
+        transaction.update(restRef, { orderCounter: next });
+
+        const orderRef = doc(collection(db, 'orders'));
+        transaction.set(orderRef, {
+          orderNumber: next,
+          items: cart,
+          total: total,
+          address: address,
+          clientName: clientName,
+          clientPhone: clientPhone,
+          clientUid: user?.uid || null,
+          status: 'pendente',
+          createdAt: serverTimestamp(),
+          restaurantId: restaurant.id,
+        });
+
+        return next;
       });
 
       // Generate WhatsApp link
-      const message = generateWhatsAppMessage(cart, total, address);
-      const phoneNumber = restaurant.whatsapp || "5511999999999";
+      const message = generateWhatsAppMessage(newOrderNumber, cart, total, address);
+      const phoneNumber = formatWhatsappForWaMe(restaurant.whatsapp) || "5511999999999";
       const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
 
       // Show success animation
+      setLastOrderNumber(newOrderNumber);
       setShowSuccess(true);
 
       // Reset cart and open WhatsApp after animation
       setTimeout(() => {
         setShowSuccess(false);
+        setLastOrderNumber(null);
         setCart([]);
         window.open(whatsappUrl, '_blank');
       }, 7500); // 7.5 seconds for even slower animation
@@ -179,6 +202,11 @@ export default function Home() {
               <div className="absolute -bottom-4 left-0 w-full h-2 bg-orange-500/20 blur-xl rounded-full animate-pulse"></div>
             </div>
             <h2 className="text-4xl font-black text-white mt-8 animate-bounce tracking-tight">Pedido Realizado!</h2>
+            {lastOrderNumber !== null && (
+              <p className="text-slate-300 font-black mt-3 text-lg tracking-wide">
+                Pedido <span className="text-orange-500">#{lastOrderNumber}</span>
+              </p>
+            )}
             <p className="text-orange-500 font-bold mt-2 text-xl italic">Sua entrega radical está a caminho!</p>
           </div>
         </div>
@@ -194,13 +222,19 @@ export default function Home() {
             />
           </Link>
           <div className="flex items-center gap-4 mt-6">
-            <div className="w-16 h-16 md:w-20 md:h-20 bg-orange-500 rounded-[2rem] flex items-center justify-center font-black text-2xl md:text-3xl text-white shadow-xl overflow-hidden border-4 border-slate-800 shrink-0">
+            <button
+              type="button"
+              onClick={() => restaurant?.logoUrl && setIsLogoExpanded((prev) => !prev)}
+              className={`w-16 h-16 md:w-20 md:h-20 bg-orange-500 rounded-[2rem] flex items-center justify-center font-black text-2xl md:text-3xl text-white shadow-xl overflow-hidden border-4 border-slate-800 shrink-0 transition-transform duration-200 ${
+                restaurant?.logoUrl ? 'cursor-pointer' : 'cursor-default'
+              } ${isLogoExpanded ? 'scale-[1.7] ring-4 ring-orange-500/40 shadow-2xl z-50' : 'hover:scale-105 active:scale-95'}`}
+            >
               {restaurant?.logoUrl ? (
                 <img src={restaurant.logoUrl} alt={restaurant.name} className="w-full h-full object-cover" />
               ) : (
                 restaurant?.name?.charAt(0) || 'R'
               )}
-            </div>
+            </button>
             <div>
               <h1 className="text-3xl md:text-4xl font-black text-white italic tracking-tight leading-none">{restaurant?.name || 'taNaMão'}</h1>
               <div className="flex items-center gap-2 mt-2">

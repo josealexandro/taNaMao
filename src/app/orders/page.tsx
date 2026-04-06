@@ -47,6 +47,13 @@ export default function OrdersPage() {
     if (normalized === 'cancelado') return 'bg-red-500/20 text-red-400 border-red-500/30';
     return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
   };
+  const formatWhatsappForWaMe = (raw: string | undefined | null) => {
+    const digits = (raw || '').replace(/\D/g, '');
+    if (!digits) return null;
+    if (digits.length === 11) return `55${digits}`;
+    if (digits.length === 13 && digits.startsWith('55')) return digits;
+    return null;
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -144,14 +151,19 @@ export default function OrdersPage() {
               const createdAt = hasToDate(order.createdAt) ? order.createdAt.toDate().toLocaleString('pt-BR') : 'Agora mesmo';
               const pillLabel = statusLabel(order.status);
               const pillClass = statusPillClass(order.status);
-              const message = encodeURIComponent(`Olá! Gostaria de saber o status do meu pedido (${order.id}).`);
-              const waUrl = restaurant?.whatsapp ? `https://wa.me/${restaurant.whatsapp}?text=${message}` : null;
+              const message = encodeURIComponent(
+                `Olá! Gostaria de saber o status do meu pedido (${order.orderNumber ? `#${order.orderNumber}` : order.id}).`
+              );
+              const restaurantPhone = formatWhatsappForWaMe(restaurant?.whatsapp);
+              const waUrl = restaurantPhone ? `https://wa.me/${restaurantPhone}?text=${message}` : null;
 
               return (
                 <div key={order.id} className="bg-slate-800/50 backdrop-blur-sm p-6 rounded-3xl border border-slate-700 shadow-2xl">
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div className="min-w-0">
-                      <p className="text-[10px] text-slate-500 font-mono truncate">ID: {order.id}</p>
+                      <p className="text-[10px] text-slate-500 font-mono truncate">
+                        {order.orderNumber ? `Pedido #${order.orderNumber}` : `ID: ${order.id}`}
+                      </p>
                       <h2 className="text-xl font-black text-white mt-1 truncate">
                         {restaurant?.name || 'Restaurante'}
                       </h2>
