@@ -18,6 +18,7 @@ export default function AdminProductsPage() {
   const [loading, setLoading] = useState(false);
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const [restaurantSlug, setRestaurantSlug] = useState<string | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   const categories = ['Pizzas', 'Lanches', 'Bebidas', 'Sobremesas', 'Outros'];
 
@@ -58,43 +59,78 @@ export default function AdminProductsPage() {
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !price || !imageFile || !restaurantId || !category) {
-      alert('Por favor, preencha todos os campos e selecione uma imagem.');
+    if (!name || !price || !restaurantId || !category) {
+      alert('Por favor, preencha todos os campos obrigatórios.');
       return;
     }
 
     setLoading(true);
     try {
-      // 1. Upload image to Firebase Storage
-      const storageRef = ref(storage, `products/${Date.now()}_${imageFile.name}`);
-      await uploadBytes(storageRef, imageFile);
-      const imageUrl = await getDownloadURL(storageRef);
+      let imageUrl = editingProduct?.image || '';
 
-      // 2. Save product with the image URL to Firestore
-      await addDoc(collection(db, 'products'), {
-        name,
-        price: parseFloat(price),
-        image: imageUrl,
-        restaurantId,
-        category,
-        isActive: true, // Começa como ativo por padrão
-      });
+      // 1. Upload new image if provided
+      if (imageFile) {
+        const storageRef = ref(storage, `products/${Date.now()}_${imageFile.name}`);
+        await uploadBytes(storageRef, imageFile);
+        imageUrl = await getDownloadURL(storageRef);
+      } else if (!editingProduct) {
+        alert('Por favor, selecione uma imagem para o novo produto.');
+        setLoading(false);
+        return;
+      }
+
+      // 2. Save or Update product
+      if (editingProduct) {
+        await updateDoc(doc(db, 'products', editingProduct.id!), {
+          name,
+          price: parseFloat(price),
+          image: imageUrl,
+          category,
+        });
+        alert('Produto atualizado com sucesso!');
+      } else {
+        await addDoc(collection(db, 'products'), {
+          name,
+          price: parseFloat(price),
+          image: imageUrl,
+          restaurantId,
+          category,
+          isActive: true,
+        });
+        alert('Produto adicionado com sucesso!');
+      }
 
       // 3. Reset form
       setName('');
       setPrice('');
       setCategory('');
       setImageFile(null);
+      setEditingProduct(null);
       const fileInput = document.getElementById('imageInput') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
-      alert('Produto adicionado com sucesso!');
 
     } catch (error) {
-      console.error("Error adding product: ", error);
-      alert('Erro ao cadastrar produto.');
+      console.error("Error saving product: ", error);
+      alert('Erro ao salvar produto.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setName(product.name);
+    setPrice(product.price.toString());
+    setCategory(product.category);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingProduct(null);
+    setName('');
+    setPrice('');
+    setCategory('');
+    setImageFile(null);
   };
 
   const handleToggleActive = async (id: string, currentStatus: boolean) => {
@@ -136,9 +172,21 @@ export default function AdminProductsPage() {
         </header>
 
         <form onSubmit={handleAddProduct} className="bg-slate-800/50 backdrop-blur-sm p-8 rounded-3xl border border-slate-700 shadow-2xl mb-12">
-          <h2 className="text-xl font-bold mb-6 text-white flex items-center gap-2">
-            <span className="text-orange-500">➕</span> Novo Produto
-          </h2>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <span className="text-orange-500">{editingProduct ? '📝' : '➕'}</span> 
+              {editingProduct ? 'Editar Produto' : 'Novo Produto'}
+            </h2>
+            {editingProduct && (
+              <button 
+                type="button" 
+                onClick={handleCancelEdit}
+                className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1 rounded-lg font-bold transition-all"
+              >
+                Cancelar Edição
+              </button>
+            )}
+          </div>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-4">
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Nome do Item</label>
@@ -178,31 +226,37 @@ export default function AdminProductsPage() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Imagem</label>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+                {editingProduct ? 'Nova Imagem (opcional)' : 'Imagem'}
+              </label>
               <input
                 id="imageInput"
                 type="file"
                 accept="image/*"
                 className="w-full bg-slate-900/50 border border-slate-700 p-2.5 rounded-xl text-slate-400 file:mr-4 file:py-1 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-bold file:bg-orange-500 file:text-white hover:file:bg-orange-600 transition-all"
                 onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                required
+                required={!editingProduct}
               />
             </div>
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="mt-8 bg-orange-500 text-white px-8 py-3 rounded-xl hover:bg-orange-600 disabled:opacity-50 font-black transition-all shadow-lg shadow-orange-500/20 active:scale-95 flex items-center gap-2"
+            className={`mt-8 px-8 py-3 rounded-xl disabled:opacity-50 font-black transition-all shadow-lg active:scale-95 flex items-center gap-2 ${
+              editingProduct 
+                ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20 text-white' 
+                : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/20 text-white'
+            }`}
           >
             {loading ? (
               <>
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                <span>Cadastrando...</span>
+                <span>{editingProduct ? 'Salvando...' : 'Cadastrando...'}</span>
               </>
             ) : (
               <>
-                <span>🚀</span>
-                <span>Cadastrar Produto</span>
+                <span>{editingProduct ? '💾' : '🚀'}</span>
+                <span>{editingProduct ? 'Salvar Alterações' : 'Cadastrar Produto'}</span>
               </>
             )}
           </button>
@@ -241,13 +295,22 @@ export default function AdminProductsPage() {
                     </button>
                   </td>
                   <td className="p-6 border-b border-slate-700">
-                    <button
-                      onClick={() => handleDeleteProduct(product.id!)}
-                      className="text-slate-500 hover:text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition-all active:scale-90"
-                      title="Excluir produto"
-                    >
-                      <span className="text-xl">🗑️</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleEditProduct(product)}
+                        className="text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 p-2 rounded-lg transition-all active:scale-90"
+                        title="Editar produto"
+                      >
+                        <span className="text-xl">📝</span>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProduct(product.id!)}
+                        className="text-slate-500 hover:text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition-all active:scale-90"
+                        title="Excluir produto"
+                      >
+                        <span className="text-xl">🗑️</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

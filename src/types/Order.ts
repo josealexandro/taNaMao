@@ -1,8 +1,20 @@
+import type { FieldValue, Timestamp } from 'firebase/firestore';
+
 export interface OrderItem {
   name: string;
   quantity: number;
   price: number;
 }
+
+export type OrderStatus =
+  | 'pendente'
+  | 'aceito'
+  | 'preparando'
+  | 'saiu_entrega'
+  | 'concluido'
+  | 'cancelado'
+  | 'pending'
+  | 'completed';
 
 export interface Order {
   id?: string;
@@ -11,8 +23,9 @@ export interface Order {
   address: string;
   clientName: string;
   clientPhone: string;
-  status: 'pending' | 'completed';
-  createdAt: any; // Firestore Timestamp
-  completedAt?: any; // Firestore Timestamp (opcional)
+  clientUid?: string | null;
+  status: OrderStatus;
+  createdAt: Timestamp | FieldValue;
+  completedAt?: Timestamp | FieldValue;
   restaurantId: string; // ID do restaurante que recebeu o pedido
 }

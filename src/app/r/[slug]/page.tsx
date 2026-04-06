@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { db, auth, googleProvider } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, serverTimestamp, limit, where } from 'firebase/firestore';
-import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
+import { db, auth } from '@/lib/firebase';
+import { collection, addDoc, onSnapshot, query, serverTimestamp, limit, where, doc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { Product } from '@/types/Product';
 import { OrderItem } from '@/types/Order';
 import { Restaurant } from '@/types/Restaurant';
@@ -11,10 +11,11 @@ import ProductCard from '@/components/ProductCard';
 import Cart from '@/components/Cart';
 import Link from 'next/link';
 
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 
 export default function Home() {
   const params = useParams();
+  const router = useRouter();
   const slug = params.slug as string;
   
   const [products, setProducts] = useState<Product[]>([]);
@@ -23,10 +24,18 @@ export default function Home() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [isRestaurantUser, setIsRestaurantUser] = useState(false);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      if (currentUser) {
+        getDoc(doc(db, 'restaurants', currentUser.uid))
+          .then((snap) => setIsRestaurantUser(snap.exists()))
+          .catch(() => setIsRestaurantUser(false));
+      } else {
+        setIsRestaurantUser(false);
+      }
     });
 
     // Buscar o restaurante baseado no SLUG da URL
@@ -63,12 +72,8 @@ export default function Home() {
     };
   }, [slug]);
 
-  const handleLogin = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error("Login failed:", error);
-    }
+  const handleLogin = () => {
+    router.push('/login?role=client');
   };
 
   const handleLogout = async () => {
@@ -118,7 +123,8 @@ export default function Home() {
         address: address,
         clientName: clientName,
         clientPhone: clientPhone,
-        status: 'pending',
+        clientUid: user?.uid || null,
+        status: 'pendente',
         createdAt: serverTimestamp(),
         restaurantId: restaurant.id,
       });
@@ -162,9 +168,9 @@ export default function Home() {
                   alt="Entregador Rally" 
                   className="w-40 h-40 md:w-64 md:h-64 object-contain"
                   onError={(e) => {
-                    // Fallback para o emoji caso a imagem não exista
-                    (e.target as any).style.display = 'none';
-                    const nextEl = (e.target as any).nextSibling;
+                    const img = e.currentTarget;
+                    img.style.display = 'none';
+                    const nextEl = img.nextElementSibling as HTMLElement | null;
                     if (nextEl) nextEl.style.display = 'inline';
                   }}
                 />
@@ -184,13 +190,27 @@ export default function Home() {
             <img 
               src="/tanamao_512.png" 
               alt="taNaMão Logo" 
-              className="h-24 md:h-32 lg:h-40 w-auto object-contain drop-shadow-[0_0_20px_rgba(249,115,22,0.5)]"
+              className="h-20 md:h-24 lg:h-32 w-auto object-contain drop-shadow-[0_0_20px_rgba(249,115,22,0.5)]"
             />
           </Link>
-          <h1 className="text-2xl font-black text-white mt-4">{restaurant?.name || 'taNaMão'}</h1>
-          <p className="text-slate-400 font-medium mt-1 text-center sm:text-left italic">
-            O sabor que você deseja, na velocidade que você precisa.
-          </p>
+          <div className="flex items-center gap-4 mt-6">
+            <div className="w-16 h-16 md:w-20 md:h-20 bg-orange-500 rounded-[2rem] flex items-center justify-center font-black text-2xl md:text-3xl text-white shadow-xl overflow-hidden border-4 border-slate-800 shrink-0">
+              {restaurant?.logoUrl ? (
+                <img src={restaurant.logoUrl} alt={restaurant.name} className="w-full h-full object-cover" />
+              ) : (
+                restaurant?.name?.charAt(0) || 'R'
+              )}
+            </div>
+            <div>
+              <h1 className="text-3xl md:text-4xl font-black text-white italic tracking-tight leading-none">{restaurant?.name || 'taNaMão'}</h1>
+              <div className="flex items-center gap-2 mt-2">
+                <span className={`w-2 h-2 rounded-full ${restaurant?.isOpen !== false ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
+                <p className="text-slate-500 font-bold text-xs uppercase tracking-widest">
+                  {restaurant?.isOpen !== false ? 'Aberto Agora' : 'Fechado no Momento'}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
         
         <div className="flex items-center gap-4">
@@ -198,9 +218,16 @@ export default function Home() {
             <div className="flex items-center gap-4 bg-slate-800/50 p-2 pl-4 rounded-full border border-slate-700">
               <div className="flex flex-col items-end">
                 <span className="text-xs font-bold text-slate-200">{user.displayName || user.email}</span>
-                <Link href="/admin" className="text-[10px] text-orange-500 font-black uppercase hover:underline">
-                  Acessar Painel
-                </Link>
+                <div className="flex items-center gap-3">
+                  <Link href="/orders" className="text-[10px] text-orange-500 font-black uppercase hover:underline">
+                    Meus Pedidos
+                  </Link>
+                  {isRestaurantUser && (
+                    <Link href="/admin" className="text-[10px] text-slate-400 font-black uppercase hover:underline">
+                      Admin
+                    </Link>
+                  )}
+                </div>
               </div>
               <button 
                 onClick={handleLogout}
@@ -234,21 +261,48 @@ export default function Home() {
 
 
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10">
-        <div className="lg:col-span-8">
+        <div className="lg:col-span-8 relative">
+          {/* Loja Fechada Overlay */}
+          {restaurant && restaurant.isOpen === false && (
+            <div className="absolute inset-0 z-40 bg-[#0f172a]/60 backdrop-blur-[2px] rounded-3xl flex items-start justify-center pt-20">
+              <div className="bg-slate-900/90 border border-slate-700 p-6 rounded-2xl shadow-2xl text-center max-w-xs animate-in fade-in zoom-in duration-300">
+                <span className="text-4xl mb-4 block">🌙</span>
+                <h3 className="text-xl font-black text-white italic">Loja Fechada</h3>
+                <p className="text-slate-400 text-sm mt-2 font-medium">Estamos descansando no momento. Volte em breve para fazer seu pedido!</p>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-3 mb-8">
             <div className="h-8 w-1.5 bg-orange-500 rounded-full"></div>
             <h2 className="text-3xl font-black text-white italic tracking-tight">Nosso Cardápio</h2>
           </div>
-          
-          <div className="space-y-16">
+
+          {/* Categorias Estilo InstaDelivery */}
+          <div className="sticky top-0 z-30 bg-[#0f172a]/80 backdrop-blur-md -mx-4 px-4 py-4 mb-8 overflow-x-auto no-scrollbar flex gap-3">
             {Array.from(new Set(products.map(p => p.category))).map(cat => (
-              <div key={cat} className="space-y-8">
+              <button
+                key={cat}
+                onClick={() => {
+                  const element = document.getElementById(`cat-${cat}`);
+                  element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="whitespace-nowrap bg-slate-800 hover:bg-orange-500 text-white px-5 py-2 rounded-full font-bold text-sm transition-all border border-slate-700 active:scale-95"
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+          
+          <div className="space-y-12">
+            {Array.from(new Set(products.map(p => p.category))).map(cat => (
+              <div key={cat} id={`cat-${cat}`} className="space-y-6 scroll-mt-24">
                 <div className="flex items-center gap-4">
                   <h3 className="text-xl font-black text-orange-500 uppercase tracking-[0.2em]">{cat}</h3>
                   <div className="flex-1 h-[1px] bg-slate-800"></div>
                 </div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
                   {products.filter(p => p.category === cat).map((product) => (
                     <ProductCard
                       key={product.id}
@@ -277,6 +331,7 @@ export default function Home() {
               total={calculateTotal()}
               onFinishOrder={handleFinishOrder}
               loading={loading}
+              isStoreOpen={restaurant?.isOpen !== false}
             />
           </div>
         </aside>
@@ -288,6 +343,7 @@ export default function Home() {
             total={calculateTotal()}
             onFinishOrder={handleFinishOrder}
             loading={loading}
+            isStoreOpen={restaurant?.isOpen !== false}
           />
         </div>
       </div>

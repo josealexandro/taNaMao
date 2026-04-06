@@ -64,12 +64,21 @@ export default function RootPage() {
               className="group bg-slate-800/40 backdrop-blur-md p-8 rounded-[2.5rem] border border-slate-700/50 hover:border-orange-500/50 transition-all hover:scale-[1.02] hover:shadow-2xl hover:shadow-orange-500/10"
             >
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center text-3xl font-black text-white shadow-lg group-hover:rotate-6 transition-transform">
-                  {rest.name.charAt(0)}
+                <div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center text-3xl font-black text-white shadow-lg group-hover:rotate-6 transition-transform overflow-hidden">
+                  {rest.logoUrl ? (
+                    <img src={rest.logoUrl} alt={rest.name} className="w-full h-full object-cover" />
+                  ) : (
+                    rest.name.charAt(0)
+                  )}
                 </div>
                 <div>
                   <h2 className="text-2xl font-black text-white group-hover:text-orange-500 transition-colors">{rest.name}</h2>
-                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Clique para ver o cardápio</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`w-1.5 h-1.5 rounded-full ${rest.isOpen !== false ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                      {rest.isOpen !== false ? 'Aberto' : 'Fechado'}
+                    </p>
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-orange-500 font-black text-sm">
@@ -81,7 +90,7 @@ export default function RootPage() {
 
           {/* Card para novos restaurantes */}
           <Link 
-            href="/login"
+            href="/login?role=restaurant&mode=signup"
             className="group bg-slate-900/40 border-2 border-dashed border-slate-700 p-8 rounded-[2.5rem] flex flex-col items-center justify-center text-center hover:border-orange-500/50 transition-all"
           >
             <div className="text-4xl mb-4 grayscale group-hover:grayscale-0 transition-all">🏪</div>
